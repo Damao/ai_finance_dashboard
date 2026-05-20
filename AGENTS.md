@@ -1,7 +1,9 @@
-# AGENTS.md — 家庭财务看板 DEMO 项目导读
+# AGENTS.md — AI Finance Dashboard DEMO 项目导读
 
-> 本文件给朋友们的 AI 助手（Claude / ChatGPT / Cursor / CodeBuddy / Gemini 等）看。
+> 本文件给朋友们的 AI 助手（Claude / ChatGPT / Cursor / CodeBuddy / Trae / Gemini 等）看。
 > 拿到这个项目后，AI 应该按这个文件指引帮用户把 DEMO 数据替换成真实数据。
+>
+> **核心原则：用户大概率不会用命令行，所有"跑脚本/起服务/装依赖"的活儿都是你（AI）来做。**
 
 ---
 
@@ -11,7 +13,10 @@
 
 1. 理解项目结构（读这个文件 + README.md 即可，不用看 .js 源码）
 2. 把 DEMO 数据替换成用户自己的真实数据
-3. 后续每隔一段时间帮用户「报数」：append history.json snapshot
+3. 启本地预览服务（不要让用户碰命令行）
+4. 后续每隔一段时间帮用户「报数」：append history.json snapshot
+
+**用户体感**：他只是把文件夹拖给你，跟你聊天，截图丢过来。所有命令、所有 JSON 编辑、所有备份都是你做。
 
 ---
 
@@ -49,11 +54,11 @@ data/
 ### Step 1：先备份
 
 ```bash
-cd family-finance-dashboard
+cd ai_finance_dashboard
 python3 scripts/backup_data.py "迁移到真实数据前的备份"
 ```
 
-每次大改前都跑一次。备份在 `data/_backups/<时间戳>/`。
+每次大改前**你（AI）自动跑一次**，不要让用户跑。备份在 `data/_backups/<时间戳>/`。
 
 ### Step 2：问清楚用户基本盘
 
@@ -165,10 +170,12 @@ python3 scripts/backup_data.py "迁移到真实数据前的备份"
 
 ## 验证清单
 
-每次改完数据，让用户做：
+每次改完数据，**你（AI）替用户做**这些验证（不要让用户碰命令行）：
 
 1. JSON 校验：`python3 -c "import json; json.load(open('data/target.json'))"`（每个文件来一次）
 2. 启服务：`python3 -m http.server 8765` → 浏览器开 `http://localhost:8765`
+   - 在 Cursor / CodeBuddy / Claude Desktop 里直接用 IDE 内置预览或 preview_url 工具
+   - 不要让用户开终端
 3. 看 console 是否报错
 4. 看健康检查 banner 是否合理（红线告警 / 偏离）
 5. 看右上角 KPI 数字是否符合用户预期
