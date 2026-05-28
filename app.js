@@ -6,6 +6,7 @@
 (function () {
   const C = window.AssetCore;
   const fmt = C.fmt, fmtK = C.fmtK, pct = C.pct;
+  const pp = (x, d=1) => (x == null || isNaN(x)) ? "—" : (x*100).toFixed(d) + "pp";
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 
@@ -37,7 +38,7 @@
       renderTencentLadder(cur);
       renderReconcile(prev, cur);
       renderKPIs(cur, prev, target);
-      renderSwrCard(cur, target);
+      renderCoastCard(cur, target);
       renderModules(cur);
       renderAlerts(cur);
       renderCurrency(cur, target);
@@ -98,6 +99,7 @@ python3 -m http.server 8765</pre>
         label: "总资产 (RMB)",
         value: fmtK(total),
         sub: `金融盘 ${fmtK(financialTotal)} · 不动产 ${fmtK(total - financialTotal)}`,
+        help: "总盘=所有模块子项折RMB市值之和；金融盘=剔除房产+待变现；不动产=总盘-金融盘",
         delta: deltaText, deltaCls,
         tone: "ok",
       },
@@ -105,28 +107,31 @@ python3 -m http.server 8765</pre>
         label: "腾讯单一敞口",
         value: pct(tencentPct, 1),
         sub: `红线 ≤ ${pct(redLine,0)} · ${fmtK(tencentRMB)} RMB`,
+        help: "合并所有腾讯子项后占总盘比例；用于检查单一公司红线（默认5%）",
         tone: tencentPct > redLine ? "danger" : "ok",
       },
       {
         label: "RMB 占比",
         value: pct(rmbPct, 1),
         sub: rmbPct > 0.70 ? "已超 70% 红线" : (rmbPct > 0.60 ? "高于 V2.0 目标 60%" : "在目标内"),
+        help: "RMB子项折RMB市值占总盘比例；红线70%/目标60%",
         tone: rmbPct > 0.70 ? "danger" : (rmbPct > 0.60 ? "warn" : "ok"),
       },
       {
         label: "大类 / 子项告警",
         value: `${overModules+underModules} / ${overSubs+underSubs}`,
         sub: (overModules+underModules) === 0 ? "全部模块在阈值内" : `模块超${overModules} 偏低${underModules} · 子项超${overSubs} 偏低${underSubs}`,
+        help: "告警数：超/偏低模块数 / 超/偏低子项数（基于阈值判定）",
         tone: overModules > 0 ? "danger" : (underModules > 0 || overSubs > 0 ? "warn" : "ok"),
       },
     ];
     $("#kpis").innerHTML = main.map(k => `
       <div class="kpi ${k.tone}">
         <div class="stripe"></div>
-        <div class="label">${k.label}</div>
-        <div class="value num">${k.value}</div>
-        <div class="sub">${k.sub}</div>
-        ${k.delta ? `<div class="delta ${k.deltaCls}">${k.delta}</div>` : ""}
+        <div class="label" title="${k.help || ""}">${k.label}</div>
+        <div class="value num" title="${k.help || ""}">${k.value}</div>
+        <div class="sub" title="${k.help || ""}">${k.sub}</div>
+        ${k.delta ? `<div class="delta ${k.deltaCls}" title="环比变化=本次快照总盘-上次快照总盘">${k.delta}</div>` : ""}
       </div>
     `).join("");
 
@@ -153,33 +158,37 @@ python3 -m http.server 8765</pre>
         label: "证券持仓盈亏",
         value: (pl >= 0 ? "+" : "") + fmtK(pl),
         sub: `市值 ${fmtK(mvSec)} / 成本 ${fmtK(costSec)} · ${pct(plPct, 1)}`,
+        help: "仅统计有shares字段的证券持仓；浮盈亏=市值-成本",
         tone: pl >= 0 ? "ok" : "warn",
       },
       {
         label: "整体盘预期年化",
         value: pct(totalReturn, 2),
         sub: `含房产；20 年终值 ${fmtK(total * Math.pow(1+totalReturn, 20))}`,
+        help: "按各子项expectedReturn加权；整体盘口径含房产",
         tone: "ok",
       },
       {
         label: "金融盘预期年化",
         value: pct(financialReturn, 2),
         sub: `剔除房产 · ${fmtK(financialTotal)} → ${fmtK(financialTotal * Math.pow(1+financialReturn, 20))}`,
+        help: "按各子项expectedReturn加权；金融盘口径剔除房产",
         tone: "ok",
       },
       {
         label: "退休年现金流缺口",
         value: gap >= 0 ? "+" + fmtK(-gap) : "-" + fmtK(gap),
         sub: `年开销 ${fmtK(annualExpense)} − 被动收入 ${fmtK(annualPassive)} ${ret.selfRetireYear ? "· 假设 " + ret.selfRetireYear + " 退休" : ""}`,
+        help: "退休年开销估算-被动收入估算；为正表示缺口（需要投资收益或降低开销弥补）",
         tone: gap > 0 ? "warn" : "ok",
       },
     ];
     $("#kpis-secondary").innerHTML = secondary.map(k => `
       <div class="kpi ${k.tone}">
         <div class="stripe"></div>
-        <div class="label">${k.label}</div>
-        <div class="value num">${k.value}</div>
-        <div class="sub">${k.sub}</div>
+        <div class="label" title="${k.help || ""}">${k.label}</div>
+        <div class="value num" title="${k.help || ""}">${k.value}</div>
+        <div class="sub" title="${k.help || ""}">${k.sub}</div>
       </div>
     `).join("");
   }
@@ -209,7 +218,7 @@ python3 -m http.server 8765</pre>
     if (!_recurringCache) return 0;
     const rates = _recurringCache._rates || { USD:6.8, HKD:0.87 };
     const toRMB = (a,c) => a * (c==="RMB" ? 1 : (rates[c] || 1));
-    // 1) recurring 收入 — 退休口径只算被动（房租 / 家庭代管 / 退休后零散），剔除工资
+    // 1) recurring 收入 — 退休口径只算被动（房租 / 妈妈月存 / 退休后零散），剔除工资
     const PASSIVE_KINDS = new Set(["rental_income","family_deposit","side_gig"]);
     const recurringIn = (_recurringCache.incomes || []).reduce((acc,i) => {
       if (!PASSIVE_KINDS.has(i.kind)) return acc;
@@ -240,58 +249,94 @@ python3 -m http.server 8765</pre>
     return { rigid, elastic, total: rigid + elastic };
   }
 
-  // ---- SWR 反推卡：按 3% / 3.5% / 4% SWR 反推 FIRE 所需总盘 ----
-  function renderSwrCard(cur, target) {
-    const root = $("#swr-card");
+  // ---- Coast FIRE 卡：今天的本金不再注资，靠复利到法退年能否养到底 ----
+  // 公式：CoastNumber = (annualMultiple × 年开销) / (1 + r)^years
+  // 如果当前总盘 ≥ CoastNumber → 已 Coast：可以停止注资
+  // 注：realReturns 是"扣除通胀的实际收益率"，所以 25× 年开销也是今天购买力，无需再调通胀
+  function renderCoastCard(cur, target) {
+    const root = $("#swr-card"); // 容器名沿用 #swr-card，避免改 HTML
     if (!root) return;
-    if (!_recurringCache) { root.innerHTML = ""; return; } // 等首屏 recurring 加载完成后再渲
+    if (!_recurringCache) { root.innerHTML = ""; return; }
 
     const exp = computeAnnualExpenseBreakdown();
     const total = cur.total || 0;
-    // 三档 SWR：保守（Lean / 有遗产意识）→ 经典（Trinity）→ 激进（Coast / 弹性下调）
-    const SWR_LEVELS = [
-      { swr: 0.030, key: "lean",    label: "Lean",    note: "保守，可终身不动本金" },
-      { swr: 0.035, key: "regular", label: "Regular", note: "Bengen 修订版，30 年 95% 概率" },
-      { swr: 0.040, key: "classic", label: "Classic", note: "Trinity 经典，30 年覆盖" },
-    ];
 
-    // 同时给两个口径：刚性 only（最低底线）+ 总开销（含弹性）
-    const baselines = [
-      { key: "rigid", expense: exp.rigid,  label: "刚性底线" },
-      { key: "total", expense: exp.total,  label: "完整开销" },
+    const cfg = target.coastFire || {};
+    const currentAge = cfg.selfCurrentAge || 40;
+    const retireAge  = cfg.legalRetireAge || 60;
+    const years      = Math.max(0, retireAge - currentAge);
+    const mult       = cfg.annualMultiple || 25;
+    const realReturns = cfg.realReturns || { conservative:0.05, neutral:0.06, optimistic:0.07 };
+
+    const targetCorpus = mult * exp.total; // 退休时所需本金（今天购买力）
+
+    const LEVELS = [
+      { key: "conservative", label: "保守", r: realReturns.conservative, hint: "实际 5% · 类全球股债 60/40 长期" },
+      { key: "neutral",      label: "中性", r: realReturns.neutral,      hint: "实际 6% · 偏股全球分散" },
+      { key: "optimistic",   label: "乐观", r: realReturns.optimistic,   hint: "实际 7% · 偏股+小盘价值溢价" },
     ];
 
     const fmtPct = p => `${(p*100).toFixed(0)}%`;
-
-    const rowsHTML = SWR_LEVELS.map(lv => {
-      // 默认拿"完整开销"做反推，括号里附刚性所需
-      const targetTotal = exp.total / lv.swr;
-      const targetRigid = exp.rigid / lv.swr;
-      const progress = targetTotal > 0 ? Math.min(1, total / targetTotal) : 0;
-      const done = progress >= 1;
-      const far = progress < 0.5;
-      const fillW = Math.max(2, progress * 100); // 至少给 2% 让条可见
-      const gap = targetTotal - total;
+    const rowsHTML = LEVELS.map(lv => {
+      const factor = Math.pow(1 + lv.r, years); // 复利倍数
+      const coastNumber = targetCorpus / factor;
+      const ratio = coastNumber > 0 ? total / coastNumber : 0;
+      const done = ratio >= 1;
+      const far  = ratio < 0.5;
+      const fillW = Math.max(2, Math.min(100, ratio * 100));
+      const gap = coastNumber - total;
       const gapStr = gap > 0 ? `差 ${fmtK(gap)}` : `已超 ${fmtK(-gap)}`;
+
+      // 反算：当前总盘按这个收益率，多少年能复利到 targetCorpus
+      // years_needed = log(targetCorpus / total) / log(1+r)
+      let yearsToCoast = "—";
+      if (total > 0 && targetCorpus > total) {
+        const n = Math.log(targetCorpus / total) / Math.log(1 + lv.r);
+        if (isFinite(n) && n > 0) yearsToCoast = `${n.toFixed(1)} 年`;
+      } else if (total >= targetCorpus) {
+        yearsToCoast = "已达成";
+      }
+
       return `
         <div class="swr-row">
-          <div class="tag">${lv.label}<span class="pct">${(lv.swr*100).toFixed(1)}%</span></div>
+          <div class="tag">${lv.label}<span class="pct">${(lv.r*100).toFixed(0)}%</span></div>
           <div class="bar"><div class="fill ${done?'done':''}" style="width:${fillW}%"></div></div>
-          <div class="target">≥ ${fmtK(targetTotal)}<br><span style="color:var(--text-3);font-size:10px">刚性 ${fmtK(targetRigid)}</span></div>
-          <div class="progress ${done?'done':(far?'far':'')}">${fmtPct(progress)}<br><span style="color:var(--text-3);font-weight:400;font-size:10px">${gapStr}</span></div>
+          <div class="target">需 ≥ ${fmtK(coastNumber)}<br><span style="color:var(--text-3);font-size:10px">复利后 ${fmtK(total * factor)}</span></div>
+          <div class="progress ${done?'done':(far?'far':'')}">${fmtPct(ratio)}<br><span style="color:var(--text-3);font-weight:400;font-size:10px">${gapStr}</span></div>
         </div>
       `;
     }).join("");
 
+    // 兜底：Bengen 3.5% 安全提取（只显示 1 行，作为参考）
+    const bengenTarget = exp.total / 0.035;
+    const bengenRatio  = bengenTarget > 0 ? total / bengenTarget : 0;
+    const bengenDone   = bengenRatio >= 1;
+    const bengenGap    = bengenTarget - total;
+    const bengenGapStr = bengenGap > 0 ? `差 ${fmtK(bengenGap)}` : `已超 ${fmtK(-bengenGap)}`;
+
+    // 整体已 Coast 状态（中性档为准）
+    const neutralFactor = Math.pow(1 + realReturns.neutral, years);
+    const neutralCoast  = targetCorpus / neutralFactor;
+    const overallDone   = total >= neutralCoast;
+
     root.innerHTML = `
-      <div class="swr-card">
+      <div class="swr-card ${overallDone ? 'achieved' : ''}">
         <div class="swr-head">
-          <div class="title"><span class="icon">🔥</span>FIRE 总盘目标 · 按 SWR 反推</div>
-          <div class="now">当前总盘 <b>${fmtK(total)}</b> · 年开销 <b>${fmtK(exp.total)}</b></div>
+          <div class="title">
+            <span class="icon">${overallDone ? '✅' : '🔥'}</span>
+            Coast FIRE ${overallDone ? '· 已达成' : '· 进度'}
+            <span style="color:var(--text-2);font-weight:400;font-size:var(--fs-xs);margin-left:8px">现在 ${currentAge} 岁 → ${retireAge} 岁停止打工，靠复利养到底</span>
+          </div>
+          <div class="now">总盘 <b>${fmtK(total)}</b> · 年开销 <b>${fmtK(exp.total)}</b> · ${retireAge}岁需 <b>${fmtK(targetCorpus)}</b></div>
         </div>
         <div class="swr-rows">${rowsHTML}</div>
+        <div class="swr-bengen ${bengenDone?'done':''}">
+          <span class="bengen-label">Full FIRE 兜底</span>
+          <span class="bengen-detail">Bengen 3.5% 安全提取 → 本金需 ≥ <b>${fmtK(bengenTarget)}</b></span>
+          <span class="bengen-progress ${bengenDone?'done':''}">${fmtPct(bengenRatio)} · ${bengenGapStr}</span>
+        </div>
         <div class="swr-foot">
-          口径：<code>年开销 ${fmtK(exp.total)}</code> = 刚性 <code>${fmtK(exp.rigid)}</code>（recurring）+ 弹性估 <code>${fmtK(exp.elastic)}</code> · 房产计入总盘 · SWR 来自 Bengen 1994 / Trinity Study
+          口径：年开销 <code>${fmtK(exp.total)}</code> · ${mult}× 倍数 · 实际收益率（已含通胀对冲）· 房产计入总盘 · 公式 <code>Need = ${mult}×Exp / (1+r)^${years}</code>
         </div>
       </div>
     `;
@@ -305,9 +350,9 @@ python3 -m http.server 8765</pre>
   });
 
   function statusChip(status, delta) {
-    if (status === "over")  return `<span class="chip danger">超 +${pct(delta,1)}</span>`;
-    if (status === "under") return `<span class="chip warn">偏低 ${pct(delta,1)}</span>`;
-    return `<span class="chip ok">在阈值内</span>`;
+    if (status === "over")  return `<span class="chip danger" title="偏离Δ=实际占比-目标占比（单位pp）">超 +${pp(delta,1)}</span>`;
+    if (status === "under") return `<span class="chip warn" title="偏离Δ=实际占比-目标占比（单位pp）">偏低 ${pp(delta,1)}</span>`;
+    return `<span class="chip ok" title="偏离Δ在阈值范围内">在阈值内</span>`;
   }
   const ccyTag = c => `<span class="ccy ${c}">${c}</span>`;
   function phaseBadgeHTML(phase) {
@@ -333,6 +378,7 @@ python3 -m http.server 8765</pre>
       const bandR   = Math.min(100, (upper / axisMax) * 100);
       const fillCls = m.status === "over" ? "over" : (m.status === "under" ? "under" : "");
       const pctCls  = m.status === "over" ? "over" : (m.status === "under" ? "under" : "");
+      const modPctTitle = `模块实际占比=模块小计/总盘；目标=${pct(m.targetPct,0)}；偏离Δ=${pp(m.delta,1)}；阈值±${pct(m.thresholdPct,0)}`;
 
       return `
         <div class="mod">
@@ -342,11 +388,11 @@ python3 -m http.server 8765</pre>
                 <span class="roman serif">${m.roman}</span>${m.name}
                 ${statusChip(m.status, m.delta)}
               </div>
-              <div style="color:var(--text-2);font-size:11px;margin-top:4px">小计 <span class="num">${fmt(m.total)}</span> RMB</div>
+              <div style="color:var(--text-2);font-size:11px;margin-top:4px" title="模块小计=该模块所有子项市值（折RMB）之和">小计 <span class="num">${fmt(m.total)}</span> RMB</div>
             </div>
             <div class="mod-meta">
-              <div class="pct ${pctCls} num">${pct(m.actualPct,1)}</div>
-              <div class="target">目标 ${pct(m.targetPct,0)} · 阈值 ±${pct(m.thresholdPct,0)}</div>
+              <div class="pct ${pctCls} num" title="${modPctTitle}">${pct(m.actualPct,1)}</div>
+              <div class="target" title="${modPctTitle}">目标 ${pct(m.targetPct,0)} · 阈值 ±${pct(m.thresholdPct,0)}</div>
             </div>
           </div>
           <div class="bar">
@@ -358,20 +404,29 @@ python3 -m http.server 8765</pre>
             ${m.subs.map(s => {
               const subTarget = (s.subTargetPct != null) ? pct(s.subTargetPct,1) : "—";
               const subDeltaTxt = s.subThresholdPct != null && s.subThresholdPct > 0
-                ? `${s.delta>=0?"+":""}${pct(s.delta,1)}`
+                ? `Δ ${s.delta>=0?"+":""}${pp(s.delta,1)}`
                 : "";
               const subStateCls = (s.status === "over" || s.status === "under") ? s.status : "ok";
               const venue = s.venue ? `<span style="color:var(--text-2);font-size:11px">· ${s.venue}</span>` : "";
               const phaseBadge = phaseBadgeHTML(s.phase);
+              const rawTitle = s.shares != null
+                ? `原币口径：${fmt(s.shares)} 股 × ${(s.price||0).toFixed(2)} ${s.ccy}（成本 ${(s.costPerShare||0).toFixed(2)}）`
+                : `原币口径：${fmt(s.raw)} ${s.ccy}`;
+              const rmbTitle = s.shares != null && s.costRMB ? (() => {
+                const pl = s.rmb - s.costRMB;
+                const plPct = pl / s.costRMB;
+                return `市值（折RMB）=${fmt(s.rmb)}；成本（折RMB）=${fmt(s.costRMB)}；浮盈亏=${pl>=0?"+":""}${fmtK(pl)}（${(plPct*100).toFixed(1)}%）`;
+              })() : `市值（折RMB）=${fmt(s.rmb)}`;
+              const stateTitle = `实际占比=${pct(s.actualPct,1)}（=市值/总盘）；目标=${subTarget}；偏离Δ=${pp(s.delta,1)}；阈值±${pct(s.subThresholdPct||0,1)}；Δ单位为pp`;
               return `
                 <div class="sub-row">
                   <div class="sub-name">${ccyTag(s.ccy)}<span class="nm">${s.name}</span>${phaseBadge}${venue}</div>
-                  <div class="sub-raw num" title="${s.shares != null ? `${s.shares} 股 × ${(s.price||0).toFixed(2)} ${s.ccy}（成本 ${(s.costPerShare||0).toFixed(2)}）` : ''}">
+                  <div class="sub-raw num" title="${rawTitle}">
                     ${s.shares != null
                       ? `${fmt(s.shares)} × ${(s.price||0).toFixed(2)}`
                       : `${fmt(s.raw)} ${s.ccy}`}
                   </div>
-                  <div class="sub-rmb num">
+                  <div class="sub-rmb num" title="${rmbTitle}">
                     ${fmt(s.rmb)}
                     ${s.shares != null && s.costRMB ? (() => {
                       const pl = s.rmb - s.costRMB;
@@ -381,10 +436,10 @@ python3 -m http.server 8765</pre>
                       const color = t > 0
                         ? `hsl(150, ${(40 + t*40).toFixed(0)}%, ${(55 - t*10).toFixed(0)}%)`
                         : `hsl(${(0 - t*-10).toFixed(0)}, ${(40 + (-t)*40).toFixed(0)}%, ${(60 - (-t)*15).toFixed(0)}%)`;
-                      return `<div class="pl" style="color:${color}">${pl>=0?'+':''}${fmtK(pl)} (${(plPct*100).toFixed(1)}%)</div>`;
+                      return `<div class="pl" style="color:${color}" title="浮盈亏=市值-成本（证券类才有成本）">${pl>=0?'+':''}${fmtK(pl)} (${(plPct*100).toFixed(1)}%)</div>`;
                     })() : ''}
                   </div>
-                  <div class="sub-state ${subStateCls}" title="子项目标 ${subTarget} · 阈值 ±${pct(s.subThresholdPct||0,1)}">
+                  <div class="sub-state ${subStateCls}" title="${stateTitle}">
                     ${pct(s.actualPct,1)}<br/><span style="font-size:10px">${subDeltaTxt}</span>
                   </div>
                 </div>
@@ -417,7 +472,7 @@ python3 -m http.server 8765</pre>
           <td class="r" style="font-weight:600">${pct(m.actualPct,1)}</td>
           <td class="r">${pct(m.targetPct,0)}</td>
           <td class="r">±${pct(m.thresholdPct,0)}</td>
-          <td class="r"><span class="delta ${m.status}">${m.delta>0?"+":""}${pct(m.delta,1)}</span></td>
+          <td class="r"><span class="delta ${m.status}" title="偏离Δ=实际占比-目标占比（单位pp）">${m.delta>0?"+":""}${pp(m.delta,1)}</span></td>
           <td>${stateLabel}</td>
         </tr>
       `);
@@ -439,7 +494,7 @@ python3 -m http.server 8765</pre>
             <td class="r" style="color:var(--text-1)">${pct(s.actualPct,1)}</td>
             <td class="r" style="color:var(--text-2);font-size:11px">${s.subTargetPct != null ? pct(s.subTargetPct,1) : ""}</td>
             <td class="r" style="color:var(--text-2);font-size:11px">${s.subThresholdPct ? "±" + pct(s.subThresholdPct,1) : ""}</td>
-            <td class="r" style="color:var(--text-2);font-size:11px">${s.subThresholdPct ? `${s.delta>=0?"+":""}${pct(s.delta,1)}` : ""}</td>
+            <td class="r" style="color:var(--text-2);font-size:11px" title="偏离Δ=实际占比-目标占比（单位pp）">${s.subThresholdPct ? `${s.delta>=0?"+":""}${pp(s.delta,1)}` : ""}</td>
             <td></td>
           </tr>
         `);
@@ -470,8 +525,14 @@ python3 -m http.server 8765</pre>
         : `<span class="chip ok">RMB ${pct(rmbPct,1)} 在目标内</span>`;
   }
 
-  // ---- 趋势卡 ----
+  // ---- 趋势卡（ECharts 版本）----
+  let trendCharts = [];
   function renderTrends(enriched, activeDate) {
+    // 清理旧图表
+    trendCharts.forEach(c => c.dispose());
+    trendCharts = [];
+
+    const dates = enriched.map(s => s.date);
     const series = {
       total:    enriched.map(s => s.total),
       rmbPct:   enriched.map(s => s.total ? s.ccyTotals.RMB / s.total : 0),
@@ -483,46 +544,79 @@ python3 -m http.server 8765</pre>
       modOver:  enriched.map(s => s.modules.filter(m=>m.status!=="ok").length),
     };
     const cards = [
-      { name:"金融资产总值 (RMB)", value:fmtK(series.total[series.total.length-1]), data:series.total, fmt:fmtK, color:"var(--accent)" },
-      { name:"RMB 占比", value:pct(series.rmbPct[series.rmbPct.length-1],1), data:series.rmbPct, fmt:v=>pct(v,1), color:"var(--rmb)", refLine:0.70 },
-      { name:"腾讯单一敞口", value:pct(series.tencent[series.tencent.length-1],1), data:series.tencent, fmt:v=>pct(v,1), color:"var(--danger)", refLine:0.05 },
-      { name:"模块告警数", value:String(series.modOver[series.modOver.length-1]), data:series.modOver, fmt:v=>String(v|0), color:"var(--warn)" },
+      { name:"金融资产总值 (RMB)", value:fmtK(series.total[series.total.length-1]), data:series.total, fmt:fmtK, color:"#7aa2ff", isPct:false },
+      { name:"RMB 占比", value:pct(series.rmbPct[series.rmbPct.length-1],1), data:series.rmbPct, fmt:v=>pct(v,1), color:"#5b8bff", isPct:true, refLine:0.70 },
+      { name:"腾讯单一敞口", value:pct(series.tencent[series.tencent.length-1],1), data:series.tencent, fmt:v=>pct(v,1), color:"#ff5c7a", isPct:true, refLine:0.05 },
+      { name:"模块告警数", value:String(series.modOver[series.modOver.length-1]), data:series.modOver, fmt:v=>String(v|0), color:"#ffb454", isPct:false },
     ];
-    $("#trends").innerHTML = cards.map(c => renderTrendCard(c, enriched, activeDate)).join("");
-  }
-  function renderTrendCard(c, enriched, activeDate) {
-    const W = 600, H = 120, P = 8;
-    const data = c.data;
-    const n = data.length;
-    if (n === 0) return "";
-    const min = Math.min(...data, c.refLine ?? Infinity);
-    const max = Math.max(...data, c.refLine ?? -Infinity);
-    const span = (max - min) || 1;
-    const x = i => P + (n === 1 ? W/2 : (i*(W-2*P))/(n-1));
-    const y = v => H - P - ((v - min) / span) * (H - 2*P);
-    const points = data.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-    const areaPts = `${P},${H-P} ${points} ${(W-P)},${H-P}`;
-    const refLine = c.refLine != null
-      ? `<line x1="${P}" x2="${W-P}" y1="${y(c.refLine)}" y2="${y(c.refLine)}" stroke="var(--text-2)" stroke-width="1" stroke-dasharray="3 3" />`
-      : "";
-    const dots = data.map((v,i) => {
-      const isActive = enriched[i].date === activeDate;
-      return `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${isActive?4:2.5}" fill="${isActive?'#fff':c.color}" stroke="${c.color}" stroke-width="1.5" />`;
-    }).join("");
-    return `
-      <div class="trend">
+
+    const container = $("#trends");
+    container.innerHTML = cards.map((c, i) => `
+      <div class="trend" id="trend-chart-${i}">
         <div class="trend-head">
           <div class="t-name">${c.name}</div>
           <div class="t-val" style="color:${c.color}">${c.value}</div>
         </div>
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-          ${refLine}
-          ${n > 1 ? `<polygon points="${areaPts}" fill="${c.color}" fill-opacity="0.10" />` : ""}
-          ${n > 1 ? `<polyline points="${points}" fill="none" stroke="${c.color}" stroke-width="2" stroke-linejoin="round" />` : ""}
-          ${dots}
-        </svg>
+        <div style="width:100%;height:120px;"></div>
       </div>
-    `;
+    `).join("");
+
+    cards.forEach((c, i) => {
+      const chartDom = container.querySelector(`#trend-chart-${i} > div:last-child`);
+      const chart = echarts.init(chartDom, 'dark');
+      trendCharts.push(chart);
+
+      const activeIndex = enriched.findIndex(s => s.date === activeDate);
+
+      const option = {
+        backgroundColor: 'transparent',
+        grid: { top: 5, right: 5, bottom: 5, left: 5 },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: 'rgba(19, 23, 31, 0.95)',
+          borderColor: '#1f2533',
+          textStyle: { color: '#e8ecf3', fontSize: 11 },
+          formatter: (params) => {
+            const idx = params[0].dataIndex;
+            const date = dates[idx];
+            const val = c.isPct ? pct(c.data[idx], 2) : fmtK(c.data[idx]);
+            return `<div style="font-family:'JetBrains Mono',monospace">${date}<br/>${c.name}: <b>${val}</b></div>`;
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: dates,
+          show: false
+        },
+        yAxis: {
+          type: 'value',
+          show: false,
+          scale: true
+        },
+        series: [{
+          data: c.data,
+          type: 'line',
+          smooth: true,
+          symbol: (val, params) => params.dataIndex === activeIndex ? 'circle' : 'none',
+          symbolSize: 8,
+          lineStyle: { color: c.color, width: 2 },
+          itemStyle: { color: c.color },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: c.color + '33' },
+              { offset: 1, color: c.color + '05' }
+            ])
+          },
+          markLine: c.refLine ? {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { color: '#5e677a', type: 'dashed', width: 1 },
+            data: [{ yAxis: c.refLine }]
+          } : undefined
+        }]
+      };
+      chart.setOption(option);
+    });
   }
 
   // ---- 时间线 ----
@@ -553,7 +647,8 @@ python3 -m http.server 8765</pre>
     });
   }
 
-  // ---- 长期增长预测 ----
+  // ---- 长期增长预测（ECharts 版本）----
+  let growthChart = null;
   function renderGrowthProjection(cur, target) {
     const root = $("#growth-projection");
     if (!root) return;
@@ -575,9 +670,9 @@ python3 -m http.server 8765</pre>
     });
 
     const years = 20;
+    const xData = Array.from({length: years+1}, (_,i) => `+${i}年`);
     const series = scenarioKeys.map(sk => {
       const r = portfolioReturns[sk];
-      // 实际购买力 = 名义 / (1+infl)^y
       const data = [];
       for (let y = 0; y <= years; y++) {
         const nominal = cur.total * Math.pow(1 + r, y);
@@ -587,33 +682,6 @@ python3 -m http.server 8765</pre>
       const realReturn = (1+r)/(1+inflRate) - 1;
       return { key: sk, label: scenarios[sk].label, color: scenarios[sk].color, nominalReturn: r, realReturn, data };
     });
-
-    // SVG 图表
-    const W = 1240, H = 280, P = { l: 60, r: 30, t: 20, b: 30 };
-    const xMax = years;
-    const yMax = Math.max(...series.flatMap(s => s.data)) * 1.05;
-    const yMin = Math.min(...series.flatMap(s => s.data)) * 0.95;
-    const x = i => P.l + i * (W - P.l - P.r) / xMax;
-    const y = v => H - P.b - (v - yMin) / (yMax - yMin) * (H - P.t - P.b);
-
-    const yTicks = 5;
-    const yTickVals = Array.from({length: yTicks+1}, (_,i) => yMin + (yMax-yMin)*i/yTicks);
-
-    const linesSVG = series.map(s => {
-      const points = s.data.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-      return `
-        <polyline points="${points}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" />
-        <circle cx="${x(years).toFixed(1)}" cy="${y(s.data[years]).toFixed(1)}" r="4" fill="${s.color}" />
-      `;
-    }).join("");
-
-    const yAxisSVG = yTickVals.map(v => `
-      <line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="0.5" stroke-dasharray="2 3" />
-      <text x="${P.l-8}" y="${y(v)+3}" fill="var(--text-2)" font-size="10" text-anchor="end" font-family="JetBrains Mono">${fmtK(v)}</text>
-    `).join("");
-    const xAxisSVG = [0, 5, 10, 15, 20].map(yr => `
-      <text x="${x(yr)}" y="${H-10}" fill="var(--text-2)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">+${yr}年</text>
-    `).join("");
 
     const startYear = new Date(cur.date).getFullYear();
     const cardsHTML = series.map(s => `
@@ -639,17 +707,80 @@ python3 -m http.server 8765</pre>
       <div style="display:grid;grid-template-columns:repeat(${series.length},1fr);gap:10px;margin-bottom:14px">
         ${cardsHTML}
       </div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" preserveAspectRatio="xMidYMid meet">
-        ${yAxisSVG}
-        ${linesSVG}
-        ${xAxisSVG}
-        ${series.map((s,i) => {
-          const lastY = y(s.data[years]);
-          return `<text x="${x(years)+8}" y="${lastY+3}" fill="${s.color}" font-size="10" font-family="JetBrains Mono">${(s.data[20]/cur.total).toFixed(1)}×</text>`;
-        }).join("")}
-      </svg>
+      <div id="growth-chart" style="width:100%;height:280px;"></div>
       <div style="font-size:11px;color:var(--text-2);margin-top:8px;text-align:right">⚠️ 是预测不是承诺；实际波动远大于这条平滑曲线</div>
     `;
+
+    // 初始化 ECharts
+    const chartDom = root.querySelector('#growth-chart');
+    if (growthChart) growthChart.dispose();
+    growthChart = echarts.init(chartDom, 'dark');
+
+    const option = {
+      backgroundColor: 'transparent',
+      grid: { top: 20, right: 30, bottom: 30, left: 70 },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(19, 23, 31, 0.95)',
+        borderColor: '#1f2533',
+        textStyle: { color: '#e8ecf3', fontSize: 11 },
+        formatter: (params) => {
+          let html = `<div style="font-family:'JetBrains Mono',monospace">${params[0].axisValue}</div>`;
+          params.forEach(p => {
+            const val = fmtK(p.value);
+            const multiple = (p.value / cur.total).toFixed(1);
+            html += `<div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+              <span style="display:inline-block;width:8px;height:8px;background:${p.color};border-radius:50%"></span>
+              <span>${p.seriesName}: <b>${val}</b> (${multiple}×)</span>
+            </div>`;
+          });
+          return html;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: xData,
+        axisLine: { lineStyle: { color: '#1f2533' } },
+        axisLabel: { color: '#5e677a', fontSize: 10, fontFamily: 'JetBrains Mono' },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        splitLine: { lineStyle: { color: '#1f2533', type: 'dashed' } },
+        axisLabel: {
+          color: '#5e677a',
+          fontSize: 10,
+          fontFamily: 'JetBrains Mono',
+          formatter: (v) => fmtK(v)
+        }
+      },
+      dataZoom: [{
+        type: 'inside',
+        start: 0,
+        end: 100
+      }],
+      series: series.map(s => ({
+        name: s.label,
+        data: s.data,
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { color: s.color, width: 2.5 },
+        itemStyle: { color: s.color },
+        endLabel: {
+          show: true,
+          formatter: '{c}',
+          color: s.color,
+          fontFamily: 'JetBrains Mono',
+          fontSize: 10,
+          formatter: (p) => `${(p.value/cur.total).toFixed(1)}×`
+        }
+      }))
+    };
+    growthChart.setOption(option);
+
     root.querySelectorAll(".infl-toggle button").forEach(btn => {
       btn.addEventListener("click", () => {
         if (window.localStorage) localStorage.setItem("growthMode", btn.dataset.mode);
@@ -678,8 +809,8 @@ python3 -m http.server 8765</pre>
     const card = (label, color, target, actual, subs) => {
       const delta = actual - target;
       const cls = Math.abs(delta) > 0.05 ? (delta > 0 ? "over" : "under") : "ok";
-      const chip = cls === "over" ? `<span class="chip danger">偏多 +${pct(delta,1)}</span>`
-                 : cls === "under" ? `<span class="chip warn">偏少 ${pct(delta,1)}</span>`
+      const chip = cls === "over" ? `<span class="chip danger" title="偏离Δ=实际占比-目标占比（单位pp）">偏多 +${pp(delta,1)}</span>`
+                 : cls === "under" ? `<span class="chip warn" title="偏离Δ=实际占比-目标占比（单位pp）">偏少 ${pp(delta,1)}</span>`
                  : `<span class="chip ok">在阈值内</span>`;
       const axisMax = Math.max(target, actual) * 1.3 || 0.01;
       const fillW = Math.min(100, (actual/axisMax)*100);
@@ -750,46 +881,30 @@ python3 -m http.server 8765</pre>
     `).join("")}</div>`;
   }
 
-  // ---- 腾讯减仓阶梯小图 ----
+  // ---- 腾讯减仓阶梯（ECharts 版本）----
+  let tencentLadderChart = null;
   function renderTencentLadder(cur) {
     const root = $("#tencent-ladder");
     if (!root) return;
     const tencentSubs = cur.modules.flatMap(m => m.subs).filter(s => /^tencent_/.test(s.key) || s.key === "tencent");
     if (tencentSubs.length === 0) { root.innerHTML = ""; return; }
-    // 用 prices.tencent_futu 当统一价
     const tprice = (cur.prices && cur.prices.tencent_futu && cur.prices.tencent_futu.price) || tencentSubs[0].price;
     if (!tprice) { root.innerHTML = ""; return; }
     const totalShares = tencentSubs.reduce((a,s) => a + (s.shares || 0), 0);
     const totalRMB    = tencentSubs.reduce((a,s) => a + s.rmb, 0);
     const tencentPct  = cur.total > 0 ? totalRMB / cur.total : 0;
 
-    // 阶梯定义（DEMO：朋友请按自己的持仓和心理价位改 trigger / action）
     const ladders = [
-      { type:"attack",  label:"进攻 1",  trigger: 500, action:"减 1/3", color: "var(--ok)" },
-      { type:"attack",  label:"进攻 2",  trigger: 580, action:"再减 1/3", color: "var(--ok)" },
-      { type:"attack",  label:"进攻 3",  trigger: 680, action:"高位清仓", color: "var(--ok)" },
-      { type:"defend",  label:"防御 1",  trigger: 420, action:"砍 1/3 防雪崩", color: "var(--warn)" },
-      { type:"redline", label:"红线",    trigger: 380, action:"非主仓清完",   color: "var(--danger)" },
+      { type:"attack",  label:"进攻 1",  trigger: 500, action:"富途 -1,500", color: "#3ddc97" },
+      { type:"attack",  label:"进攻 2",  trigger: 580, action:"富途 -1,500", color: "#3ddc97" },
+      { type:"attack",  label:"进攻 3",  trigger: 680, action:"富途清仓 -2,385", color: "#3ddc97" },
+      { type:"defend",  label:"防御 1",  trigger: 420, action:"富途 -1,800", color: "#ffb454" },
+      { type:"redline", label:"红线",    trigger: 380, action:"非主仓清完",   color: "#ff5c7a" },
     ];
 
-    // 横轴范围：min/max 之间留余量
     const allPrices = ladders.map(l => l.trigger).concat([tprice]);
-    const minP = Math.min(...allPrices) * 0.92;
-    const maxP = Math.max(...allPrices) * 1.05;
-    const W = 1240, H = 90, P = { l: 80, r: 60, t: 30, b: 28 };
-    const x = p => P.l + (p - minP) / (maxP - minP) * (W - P.l - P.r);
-
-    const ladderMarks = ladders.map(l => `
-      <line x1="${x(l.trigger)}" x2="${x(l.trigger)}" y1="${P.t-6}" y2="${H-P.b+6}" stroke="${l.color}" stroke-width="1.5" stroke-dasharray="3 3" />
-      <text x="${x(l.trigger)}" y="${P.t-12}" fill="${l.color}" font-size="10" text-anchor="middle" font-family="JetBrains Mono">${l.label}</text>
-      <text x="${x(l.trigger)}" y="${H-P.b+18}" fill="var(--text-2)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">${l.trigger}</text>
-    `).join("");
-
-    // 当前价指示
-    const curMark = `
-      <circle cx="${x(tprice)}" cy="${(P.t+H-P.b)/2}" r="6" fill="var(--accent)" stroke="#fff" stroke-width="2" />
-      <text x="${x(tprice)}" y="${(P.t+H-P.b)/2 - 12}" fill="var(--accent)" font-size="11" font-weight="600" text-anchor="middle" font-family="JetBrains Mono">现价 ${tprice}</text>
-    `;
+    const minP = Math.min(...allPrices) * 0.9;
+    const maxP = Math.max(...allPrices) * 1.1;
 
     root.innerHTML = `
       <div class="lia-card" style="margin-bottom:18px">
@@ -798,25 +913,104 @@ python3 -m http.server 8765</pre>
             <span style="font-weight:600;font-size:14px">📍 腾讯减仓阶梯</span>
             <span style="color:var(--text-2);font-size:12px;margin-left:8px">合计 ${fmt(totalShares)} 股 · ${pct(tencentPct,1)} 占比</span>
           </div>
-          <a href="https://www.investopedia.com/articles/active-trading/091814/four-types-stoploss-orders.asp" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;text-decoration:none">📄 阶梯设计参考</a>
+          <a href="../腾讯减仓阶梯_2026-05-16.md" style="color:var(--accent);font-size:11px;text-decoration:none">📄 查看完整方案</a>
         </div>
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" preserveAspectRatio="xMidYMid meet">
-          <line x1="${P.l}" x2="${W-P.r}" y1="${(P.t+H-P.b)/2}" y2="${(P.t+H-P.b)/2}" stroke="var(--line)" stroke-width="2" />
-          ${ladderMarks}
-          ${curMark}
-        </svg>
-        <div style="font-size:11px;color:var(--text-2);text-align:right">下次触发：${getNextTrigger(tprice, ladders)}</div>
+        <div id="tencent-ladder-chart" style="width:100%;height:120px;"></div>
+        <div style="font-size:11px;color:var(--text-2);text-align:right;margin-top:8px">${getNextTrigger(tprice, ladders)}</div>
       </div>
     `;
+
+    const chartDom = root.querySelector('#tencent-ladder-chart');
+    if (tencentLadderChart) tencentLadderChart.dispose();
+    tencentLadderChart = echarts.init(chartDom, 'dark');
+
+    const option = {
+      backgroundColor: 'transparent',
+      grid: { top: 30, right: 30, bottom: 30, left: 30 },
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(19, 23, 31, 0.95)',
+        borderColor: '#1f2533',
+        textStyle: { color: '#e8ecf3', fontSize: 11 },
+        formatter: (params) => {
+          if (params.componentType === 'markLine') {
+            const l = ladders.find(x => x.trigger === params.value);
+            return `<div style="font-family:'JetBrains Mono',monospace">
+              <div style="color:${l.color};font-weight:600">${l.label}</div>
+              <div>触发价: <b>${l.trigger} HKD</b></div>
+              <div style="color:#9ba4b6;font-size:10px;margin-top:4px">${l.action}</div>
+            </div>`;
+          }
+          return `<div style="font-family:'JetBrains Mono',monospace">
+            <div style="color:#7aa2ff;font-weight:600">当前价格</div>
+            <div><b>${tprice} HKD</b></div>
+          </div>`;
+        }
+      },
+      xAxis: {
+        type: 'value',
+        min: minP,
+        max: maxP,
+        axisLine: { lineStyle: { color: '#1f2533' } },
+        axisLabel: { color: '#5e677a', fontSize: 10, fontFamily: 'JetBrains Mono' },
+        splitLine: { show: false },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        show: false,
+        min: 0,
+        max: 1
+      },
+      series: [
+        {
+          type: 'scatter',
+          data: [[tprice, 0.5]],
+          symbolSize: 20,
+          itemStyle: { color: '#7aa2ff', borderColor: '#fff', borderWidth: 2 },
+          label: {
+            show: true,
+            position: 'top',
+            formatter: `现价 ${tprice}`,
+            color: '#7aa2ff',
+            fontFamily: 'JetBrains Mono',
+            fontSize: 11,
+            fontWeight: 'bold'
+          }
+        },
+        {
+          type: 'line',
+          data: [],
+          markLine: {
+            symbol: 'none',
+            label: {
+              position: 'start',
+              formatter: '{b}',
+              color: '#9ba4b6',
+              fontSize: 10,
+              fontFamily: 'JetBrains Mono'
+            },
+            lineStyle: { type: 'dashed', width: 1.5 },
+            data: ladders.map(l => ({
+              xAxis: l.trigger,
+              name: l.label,
+              lineStyle: { color: l.color },
+              label: { color: l.color }
+            }))
+          }
+        }
+      ]
+    };
+    tencentLadderChart.setOption(option);
   }
   function getNextTrigger(price, ladders) {
     const upcoming = ladders.filter(l => l.type === "attack" && l.trigger > price).sort((a,b) => a.trigger - b.trigger);
     const downcoming = ladders.filter(l => (l.type === "defend" || l.type === "redline") && l.trigger < price).sort((a,b) => b.trigger - a.trigger);
     const u = upcoming[0], d = downcoming[0];
     const parts = [];
-    if (u) parts.push(`涨到 ${u.trigger} 触发 ${u.label}（${u.action}）— 还需 +${((u.trigger-price)/price*100).toFixed(1)}%`);
-    if (d) parts.push(`跌到 ${d.trigger} 触发 ${d.label}（${d.action}）— 还需 ${((d.trigger-price)/price*100).toFixed(1)}%`);
-    return parts.join(" · ") || "已超出所有阶梯";
+    if (u) parts.push(`📈 涨到 ${u.trigger} 触发 ${u.label} — 还需 +${((u.trigger-price)/price*100).toFixed(1)}%`);
+    if (d) parts.push(`📉 跌到 ${d.trigger} 触发 ${d.label} — 还需 ${((d.trigger-price)/price*100).toFixed(1)}%`);
+    return parts.join(" · ") || "✅ 已超出所有阶梯";
   }
 
   // ---- 资产 vs 现金流对账 ----

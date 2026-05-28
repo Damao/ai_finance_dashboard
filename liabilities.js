@@ -53,7 +53,7 @@
       .reduce((a,e) => a + toRMB(e.amount, e.ccy) * (e.frequency === "annual" ? 1 : 12), 0);
 
     // ---- 总负债（剔除 soft）+ 年利息 ----
-    // 对 accrual=monthly_inflow 的负债（如家庭代管），动态算累积本金
+    // 对 accrual=monthly_inflow 的负债（如妈妈月存），动态算累积本金
     const liaList = (lia.liabilities || []).map(l => {
       if (l.accrual === "monthly_inflow" && l.startDate && l.monthlyInflow) {
         const start = parseDate(l.startDate);
@@ -126,24 +126,28 @@
         label: "总资产 (RMB)",
         value: fmtK(latestTotal),
         sub: snaps.length ? `快照 ${snaps[snaps.length-1].date}` : "—",
+        help: "来自history.json最新快照的总盘（折RMB）",
         tone: "ok",
       },
       {
         label: "总负债 / 软性",
         value: `${fmtK(totalDebtRMB)} / ${fmtK(softDebtRMB)}`,
         sub: `年利息 ${fmtK(annualInterestRMB)} RMB`,
+        help: "总负债含硬性+软性；软性负债不扣减净资产；利息按本金×利率估算",
         tone: totalDebtRMB > latestTotal * 0.1 ? "warn" : "ok",
       },
       {
         label: "净资产 (RMB)",
         value: fmtK(netWorth),
         sub: `软性负债 ${fmtK(softDebtRMB)} 不计入扣减`,
+        help: "净资产=总资产-硬性负债；软性负债单列（不扣减）",
         tone: "ok",
       },
       {
         label: "月度净流出",
         value: (monthlyNet >= 0 ? "+" : "") + fmtK(monthlyNet),
         sub: `收入 ${fmtK(monthlyIncomeRMB)} − 支出 ${fmtK(monthlyExpenseRMB)}`,
+        help: "基于recurring.json活跃项目；月净流=月收入-月支出（折RMB）",
         tone: monthlyNet < 0 ? "warn" : "ok",
         delta: `年化 ${(monthlyNet>=0?"+":"")}${fmtK(monthlyNet*12)} RMB`,
         deltaCls: monthlyNet < 0 ? "down" : "up",
@@ -152,18 +156,21 @@
         label: "年保费合计",
         value: fmtK(annualInsuranceRMB),
         sub: `${(rec.expenses||[]).filter(e=>e.kind==='insurance'&&isActive(e)).length} 张保单`,
+        help: "recurring.json里kind=insurance的活跃保费，折算为年合计（折RMB）",
         tone: "ok",
       },
       {
         label: "刚性支出 / 年",
         value: fmtK(monthlyExpenseRMB * 12),
         sub: `≈ 4 年开销 ${fmtK(monthlyExpenseRMB*48)}（防御现金底线）`,
+        help: "把月度刚性支出折算为年；用于估算防御现金底线",
         tone: "ok",
       },
       {
         label: `过渡期累计净流 (${today.getFullYear()}-${retirementYr})`,
         value: (transitionNet >= 0 ? "+" : "") + fmtK(transitionNet),
         sub: `工资+股票+大礼包 - 开销，含通胀。请把数额填进 income_events.json`,
+        help: "从今年到退休年（含）累计净流；含通胀假设；用于估算退休前可积累子弹",
         tone: transitionNet > 0 ? "ok" : "warn",
         delta: `${retirementYr - today.getFullYear() + 1} 年合计`,
         deltaCls: transitionNet > 0 ? "up" : "down",
@@ -171,17 +178,18 @@
       {
         label: `退休稳态年净流 (${retirementYr + 1}+)`,
         value: (postRetireSteadyNet >= 0 ? "+" : "") + fmtK(postRetireSteadyNet),
-        sub: `房租 + 零散收入 − 开销·利息·保险（不含投资分红）`,
+        sub: `房租 + 妈妈月存 + 零散 − 开销·利息·保险（不含投资分红）`,
+        help: "退休后第一年稳态净流；不含投资收益/分红，仅算稳定现金流",
         tone: postRetireSteadyNet >= 0 ? "ok" : "danger",
       },
     ];
     $("#liab-kpis").innerHTML = kpis.map(k => `
       <div class="kpi ${k.tone}">
         <div class="stripe"></div>
-        <div class="label">${k.label}</div>
-        <div class="value num">${k.value}</div>
-        <div class="sub">${k.sub}</div>
-        ${k.delta ? `<div class="delta ${k.deltaCls||'flat'}">${k.delta}</div>` : ""}
+        <div class="label" title="${k.help || ""}">${k.label}</div>
+        <div class="value num" title="${k.help || ""}">${k.value}</div>
+        <div class="sub" title="${k.help || ""}">${k.sub}</div>
+        ${k.delta ? `<div class="delta ${k.deltaCls||'flat'}" title="${k.help || ""}">${k.delta}</div>` : ""}
       </div>
     `).join("");
 
@@ -189,7 +197,7 @@
     $("#liab-list").innerHTML = `
       <div class="lia-card">
         <table class="lia-table">
-          <thead><tr><th>项目</th><th class="r">本金</th><th class="r">利率</th><th class="r">月利息</th><th class="r">年利息</th><th>性质</th><th>备注</th></tr></thead>
+          <thead><tr><th title="负债条目名称">项目</th><th class="r" title="本金按汇率折算到RMB展示">本金</th><th class="r" title="年化利率（用于估算利息）">利率</th><th class="r" title="月利息估算">月利息</th><th class="r" title="年利息估算">年利息</th><th title="硬性：扣减净资产；软性：不扣减净资产">性质</th><th title="备注信息">备注</th></tr></thead>
           <tbody>
             ${liaList.map(l => {
               const principalDisplay = l._accrued
@@ -216,7 +224,7 @@
     $("#recurring-monthly").innerHTML = `
       <div class="lia-card">
         <table class="lia-table">
-          <thead><tr><th>项目</th><th>类型</th><th class="r">原币种</th><th class="r">月折算 (RMB)</th><th class="r">年折算 (RMB)</th><th>有效期</th></tr></thead>
+          <thead><tr><th title="循环收支条目名称">项目</th><th title="收支类型(kind)">类型</th><th class="r" title="原币金额与频率">原币种</th><th class="r" title="按频率折算后的月度金额（折RMB）">月折算 (RMB)</th><th class="r" title="按频率折算后的年度金额（折RMB）">年折算 (RMB)</th><th title="startDate/endDate 生效区间">有效期</th></tr></thead>
           <tbody>
             ${monthlyRows.map(r => {
               const sign = r.dir === "in" ? "+" : "-";
@@ -265,7 +273,7 @@
           <span>剩余应缴尾款合计 <b class="num" style="color:var(--text-0)">${fmtK(totalRemaining)}</b> RMB</span>
         </div>
         <table class="lia-table">
-          <thead><tr><th>保单</th><th>被保人</th><th>受益人</th><th class="r">年保费</th><th class="r">折算 (RMB/年)</th><th>缴至</th><th class="r">剩余应缴尾款</th><th>倒计时</th></tr></thead>
+          <thead><tr><th title="保单名称/编号（展示用）">保单</th><th title="被保人">被保人</th><th title="受益人">受益人</th><th class="r" title="原币年保费（按保单币种）">年保费</th><th class="r" title="折算成人民币的年保费（按统一汇率）">折算 (RMB/年)</th><th title="缴费截止年或缴费期">缴至</th><th class="r" title="剩余应缴总额（按年保费×剩余年数估算）">剩余应缴尾款</th><th title="距离下一次缴费/截止的倒计时">倒计时</th></tr></thead>
           <tbody>
             ${policyRows.map(({p, yearsLeftRound, annualRMB, remaining, cdCls}) => `
               <tr class="${cdCls === 'warn' ? 'urgent' : ''}">
@@ -284,14 +292,13 @@
       </div>
     `;
 
-    // ---- 未来 20 年现金流瀑布 ----
-    // inflationRate / retirement 已在过渡期 KPI 块声明，这里直接复用
-    let inflationMode = (window.localStorage && localStorage.getItem("waterfallInflationMode")) || "nominal"; // nominal | real
+    // ---- 未来 20 年现金流瀑布（ECharts 版本）----
+    let waterfallChart = null;
+    let inflationMode = (window.localStorage && localStorage.getItem("waterfallInflationMode")) || "nominal";
 
     function buildYearsArr(mode) {
       const arr = [];
       const startYr = today.getFullYear();
-      // 把 income_events 按年份索引（金额>0 才入账）
       const evByYear = {};
       (incEv.events || []).forEach(ev => {
         if (!ev.year || !ev.amount || ev.amount <= 0) return;
@@ -302,29 +309,23 @@
         const yr = startYr + dy;
         let yIncome = 0, yExpense = 0;
         const liveIncomes = [], liveExpenses = [];
-        // recurring 收入（含工资、房租、退休后零散）
         (rec.incomes || []).forEach(it => {
           const months = activeMonthsInYear(it, yr);
           if (months <= 0) return;
           let amt = it.frequency === "annual" ? toRMB(it.amount, it.ccy) : toRMB(it.amount, it.ccy) * months;
-          // 通胀调整：房租随通胀温和上涨（0.5×）
           if (mode === "nominal" && it.kind === "rental_income") amt *= Math.pow(1 + inflationRate * 0.5, dy);
-          // 工资按通胀涨（保守 0.7×）
           if (mode === "nominal" && it.kind === "salary") amt *= Math.pow(1 + inflationRate * 0.7, dy);
           yIncome += amt;
           liveIncomes.push({ key: it.key, name: it.name, kind: it.kind, amt, months, endDate: it.endDate });
         });
-        // 一次性事件（股票兑现/项目分红/单点奖金等）
         (evByYear[yr] || []).forEach(ev => {
           yIncome += ev.amtRMB;
           liveIncomes.push({ key: ev.key, name: ev.name, kind: ev.kind, amt: ev.amtRMB, months: 1, endDate: null, _oneOff: true, confidence: ev.confidence });
         });
-        // recurring 支出
         (rec.expenses || []).forEach(it => {
           const months = activeMonthsInYear(it, yr);
           if (months <= 0) return;
           let amt = it.frequency === "annual" ? toRMB(it.amount, it.ccy) : toRMB(it.amount, it.ccy) * months;
-          // 名义口径：开销随通胀上涨
           if (mode === "nominal") amt *= Math.pow(1 + inflationRate, dy);
           yExpense += amt;
           liveExpenses.push({ key: it.key, name: it.name, kind: it.kind, amt, months, endDate: it.endDate });
@@ -334,14 +335,10 @@
       return arr;
     }
 
-    function renderWaterfall(mode) {
-      const yearsArr = buildYearsArr(mode);
+    function getYearEvents(yearsArr) {
       const startYear = today.getFullYear();
-
-      // 计算每年的"事件"
       yearsArr.forEach((y, i) => {
         const events = [];
-        // 一次性事件：每年都独立标记一条蓝色 chip（不论上一年有没有同 key）
         y.liveIncomes.filter(e => e._oneOff).forEach(e => {
           const conf = e.confidence != null ? `（信心 ${(e.confidence*100).toFixed(0)}%）` : "";
           events.push({ type: "one_off_income", name: e.name, amt: e.amt, label: `💎 ${e.name} +${fmtK(e.amt)}${conf}` });
@@ -350,60 +347,48 @@
         const prev = yearsArr[i-1];
         const prevExpKeys = new Set(prev.liveExpenses.map(e => e.key));
         const curExpKeys  = new Set(y.liveExpenses.map(e => e.key));
-        // 排除一次性事件参与"新增/消失"诊断（它们本来就只发生一次）
         const recurringPrevInc = prev.liveIncomes.filter(e => !e._oneOff);
         const recurringCurInc  = y.liveIncomes.filter(e => !e._oneOff);
         const prevIncKeys = new Set(recurringPrevInc.map(e => e.key));
         const curIncKeys  = new Set(recurringCurInc.map(e => e.key));
 
         prev.liveExpenses.filter(e => !curExpKeys.has(e.key)).forEach(e => {
-          events.push({ type: "expense_end", name: e.name, amt: e.amt, label: `🟢 ${e.name} 结束 -${fmtK(e.amt)}` });
+          events.push({ type: "expense_end", name: e.name, amt: e.amt, label: `🟢 ${e.name} 结束` });
         });
         y.liveExpenses.filter(e => !prevExpKeys.has(e.key)).forEach(e => {
-          events.push({ type: "expense_start", name: e.name, amt: e.amt, label: `🔴 新增 ${e.name} +${fmtK(e.amt)}` });
+          events.push({ type: "expense_start", name: e.name, amt: e.amt, label: `🔴 新增 ${e.name}` });
         });
         recurringPrevInc.filter(e => !curIncKeys.has(e.key)).forEach(e => {
-          // 工资类用专门 icon
           const isSalary = e.kind === "salary";
-          events.push({ type: "income_end", name: e.name, amt: e.amt, label: `${isSalary?'🎯':'🔴'} ${isSalary?'退休 · ':''}${e.name} 终止 -${fmtK(e.amt)}` });
+          events.push({ type: "income_end", name: e.name, amt: e.amt, label: `${isSalary?'🎯':'🔴'} ${isSalary?'退休 · ':''}${e.name} 终止` });
         });
         recurringCurInc.filter(e => !prevIncKeys.has(e.key)).forEach(e => {
-          events.push({ type: "income_start", name: e.name, amt: e.amt, label: `🟢 新增收入 ${e.name} +${fmtK(e.amt)}` });
+          events.push({ type: "income_start", name: e.name, amt: e.amt, label: `🟢 新增收入 ${e.name}` });
         });
-        // 同项金额变化（仅 recurring，排除一次性）
+
         const prevByKey = new Map([...prev.liveExpenses, ...recurringPrevInc].map(e => [e.key, e]));
         [...y.liveExpenses, ...recurringCurInc].forEach(cur => {
           const p = prevByKey.get(cur.key);
           if (!p) return;
           const diff = cur.amt - p.amt;
-          // 通胀模式下小幅同向变化（< 5%）跳过，避免"年年都告警通胀"
           const ratio = p.amt > 0 ? Math.abs(diff) / p.amt : 0;
-          if (mode === "nominal" && ratio < 0.05) return;
-          if (mode === "real" && Math.abs(diff) < 100) return;
+          if (ratio < 0.05) return;
           const isExp = y.liveExpenses.includes(cur);
           if (isExp) {
-            if (diff < 0) events.push({ type: "expense_end",   name: cur.name, amt: -diff, label: `🟢 ${cur.name} 减少 ${fmtK(diff)}` });
-            else          events.push({ type: "expense_start", name: cur.name, amt:  diff, label: `🔴 ${cur.name} 增加 +${fmtK(diff)}` });
+            if (diff < 0) events.push({ type: "expense_end", name: cur.name, amt: -diff, label: `🟢 ${cur.name} 减少` });
           } else {
-            if (diff > 0) events.push({ type: "income_start", name: cur.name, amt:  diff, label: `🟢 ${cur.name} 增加 +${fmtK(diff)}` });
-            else          events.push({ type: "income_end",   name: cur.name, amt: -diff, label: `🔴 ${cur.name} 减少 ${fmtK(diff)}` });
+            if (diff > 0) events.push({ type: "income_start", name: cur.name, amt: diff, label: `🟢 ${cur.name} 增加` });
           }
         });
 
-        // 合并保单缴清：用 recurring 里的 insurance kind 来识别保单条目，按 type 聚合
-        const insNames = new Set(
-          (rec.expenses || [])
-            .filter(e => e.kind === "insurance")
-            .map(e => e.name)
-        );
         const grouped = [];
         const insBuckets = {};
         events.forEach(ev => {
-          const isIns = insNames.has(ev.name);
-          if (isIns && (ev.type === "expense_end" || ev.type === "expense_start")) {
-            const k = ev.type;
+          const m = ev.name.match(/^(保诚|AIA|泰康)/);
+          if (m && (ev.type === "expense_end" || ev.type === "expense_start")) {
+            const k = `${ev.type}_${m[1]}`;
             if (!insBuckets[k]) {
-              insBuckets[k] = { type: ev.type, names: [], totalAmt: 0 };
+              insBuckets[k] = { type: ev.type, company: m[1], names: [], totalAmt: 0 };
               grouped.push({ _bucket: k, kind: "ins" });
             }
             insBuckets[k].names.push(ev.name);
@@ -416,64 +401,34 @@
           if (g.kind === "ins") {
             const b = insBuckets[g._bucket];
             const verb = b.type === "expense_end" ? "缴清" : "新缴";
-            const sign = b.type === "expense_end" ? "-" : "+";
             const icon = b.type === "expense_end" ? "🟢" : "🔴";
-            const cnt  = b.names.length;
-            const head = cnt > 1 ? `保单 ${cnt} 单${verb}` : `${b.names[0]} ${verb}`;
-            return { type: b.type, label: `${icon} ${head} ${sign}${fmtK(b.totalAmt)}` };
+            return { type: b.type, label: `${icon} ${b.company} ${b.names.length} 单${verb}` };
           }
           return g.ev;
         }).filter(v => v && v.label).filter((v,i,arr) => arr.findIndex(x => x.label === v.label) === i);
         y.events = flat;
       });
 
-      // 退休年标记
       yearsArr.forEach(y => {
         if (retirement.selfRetireYear && y.year === retirement.selfRetireYear) {
-          (y.events = y.events || []).unshift({ type: "milestone", label: `🎯 ${retirement.selfRetireYear} 起退休（无工资）` });
+          (y.events = y.events || []).unshift({ type: "milestone", label: `🎯 ${retirement.selfRetireYear} 起退休` });
         }
       });
 
-      const maxAbs = Math.max(...yearsArr.map(y => Math.max(y.income, y.expense)));
-      const html = yearsArr.map((y, i) => {
-        const incW = maxAbs ? (y.income/maxAbs)*100 : 0;
-        const expW = maxAbs ? (y.expense/maxAbs)*100 : 0;
-        const netCls = y.net >= 0 ? "positive" : "negative";
-        const isCurrent = y.year === startYear;
+      return yearsArr;
+    }
 
-        const prev = i > 0 ? yearsArr[i-1] : null;
-        const netChange = prev ? y.net - prev.net : 0;
-        const changeCls = netChange > 0 ? "positive" : (netChange < 0 ? "negative" : "");
-        const changeText = i === 0 ? "" : (netChange === 0 ? "" : `${netChange>0?'▲':'▼'} ${fmtK(Math.abs(netChange))}`);
+    function renderWaterfall(mode) {
+      const yearsArr = getYearEvents(buildYearsArr(mode));
+      const startYear = today.getFullYear();
 
-        const eventChips = (y.events || []).map(e => {
-          const colorMap = {
-            expense_end:    { color:"var(--ok)",     bg:"rgba(61,220,151,.12)" },
-            expense_start:  { color:"var(--danger)", bg:"rgba(255,92,122,.14)" },
-            income_end:     { color:"var(--danger)", bg:"rgba(255,92,122,.14)" },
-            income_start:   { color:"var(--ok)",     bg:"rgba(61,220,151,.12)" },
-            one_off_income: { color:"#22d3ee",       bg:"rgba(34,211,238,.16)" },
-            milestone:      { color:"var(--accent)", bg:"rgba(122,162,255,.18)" },
-          };
-          const c = colorMap[e.type] || { color:"var(--text-1)", bg:"var(--bg-2)" };
-          return `<span style="font-size:10px;padding:2px 8px;border-radius:999px;color:${c.color};background:${c.bg};white-space:nowrap;letter-spacing:.2px">${e.label}</span>`;
-        }).join(" ");
+      const xData = yearsArr.map(y => y.year === startYear ? `${y.year} (今)` : String(y.year));
+      const expenseData = yearsArr.map(y => -y.expense);
+      const incomeData = yearsArr.map(y => y.income);
+      const netData = yearsArr.map(y => y.net);
 
-        return `
-          <div class="wf-row${isCurrent ? ' current' : ''}">
-            <div class="yr">${y.year}${isCurrent ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">今</span>' : ''}</div>
-            <div>
-              <div class="wf-bar-wrap"><div class="wf-bar-fill" style="width:${expW}%"></div></div>
-              <div class="wf-bar-wrap" style="margin-top:3px"><div class="wf-bar-fill income" style="width:${incW}%"></div></div>
-              ${eventChips ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${eventChips}</div>` : ""}
-            </div>
-            <div class="wf-amount">支 ${fmtK(y.expense)}<br/><span class="income-line">收 ${fmtK(y.income)}</span></div>
-            <div class="wf-net ${netCls}">${y.net>=0?'+':''}${fmtK(y.net)}${changeText ? `<div class="wf-change ${changeCls}">${changeText}</div>` : ""}</div>
-          </div>
-        `;
-      }).join("");
-
-      const toggleHTML = `
+      const container = $("#waterfall");
+      container.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
           <div style="font-size:12px;color:var(--text-2)">通胀假设 <b style="color:var(--text-0);font-family:'JetBrains Mono',monospace">${(inflationRate*100).toFixed(1)}%/年</b> · ${retirement.selfRetireYear ? `计划 ${retirement.selfRetireYear} 退休` : '未设退休年'}</div>
           <div class="infl-toggle">
@@ -481,11 +436,112 @@
             <button class="${mode==='real'?'active':''}" data-mode="real">实际购买力（今天币值）</button>
           </div>
         </div>
+        <div id="waterfall-chart" style="width:100%;height:400px;"></div>
       `;
-      $("#waterfall").innerHTML = toggleHTML + html;
 
-      // 绑定按钮
-      $("#waterfall").querySelectorAll(".infl-toggle button").forEach(btn => {
+      const chartDom = container.querySelector('#waterfall-chart');
+      if (waterfallChart) waterfallChart.dispose();
+      waterfallChart = echarts.init(chartDom, 'dark');
+
+      const option = {
+        backgroundColor: 'transparent',
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: 'rgba(19, 23, 31, 0.95)',
+          borderColor: '#1f2533',
+          textStyle: { color: '#e8ecf3', fontSize: 11 },
+          formatter: (params) => {
+            const idx = params[0].dataIndex;
+            const y = yearsArr[idx];
+            let html = `<div style="font-family:'JetBrains Mono',monospace;font-weight:600;margin-bottom:6px">${y.year}年</div>`;
+            html += `<div style="display:flex;justify-content:space-between;gap:20px">
+              <span style="color:#ff5c7a">支出: <b>${fmtK(y.expense)}</b></span>
+              <span style="color:#3ddc97">收入: <b>${fmtK(y.income)}</b></span>
+            </div>`;
+            html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #1f2533">
+              <span style="color:${y.net >= 0 ? '#3ddc97' : '#ff5c7a'}">净流: <b>${y.net >= 0 ? '+' : ''}${fmtK(y.net)}</b></span>
+            </div>`;
+            if (y.events && y.events.length > 0) {
+              html += `<div style="margin-top:8px;font-size:10px;color:#9ba4b6">${y.events.map(e => e.label).join(' · ')}</div>`;
+            }
+            return html;
+          }
+        },
+        legend: {
+          data: ['支出', '收入', '净流'],
+          textStyle: { color: '#9ba4b6', fontSize: 11 },
+          top: 0
+        },
+        grid: { top: 40, right: 20, bottom: 40, left: 70 },
+        xAxis: {
+          type: 'category',
+          data: xData,
+          axisLine: { lineStyle: { color: '#1f2533' } },
+          axisLabel: { color: '#5e677a', fontSize: 10, fontFamily: 'JetBrains Mono', rotate: 45 },
+          axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: { show: false },
+          splitLine: { lineStyle: { color: '#1f2533', type: 'dashed' } },
+          axisLabel: {
+            color: '#5e677a',
+            fontSize: 10,
+            fontFamily: 'JetBrains Mono',
+            formatter: (v) => fmtK(Math.abs(v))
+          }
+        },
+        dataZoom: [{
+          type: 'inside',
+          start: 0,
+          end: 100
+        }, {
+          type: 'slider',
+          start: 0,
+          end: 100,
+          height: 20,
+          bottom: 0,
+          borderColor: '#1f2533',
+          fillerColor: 'rgba(122,162,255,0.2)',
+          handleStyle: { color: '#7aa2ff' },
+          textStyle: { color: '#5e677a' }
+        }],
+        series: [
+          {
+            name: '支出',
+            type: 'bar',
+            stack: 'total',
+            data: expenseData,
+            itemStyle: { color: '#ff5c7a', borderRadius: [2, 2, 0, 0] }
+          },
+          {
+            name: '收入',
+            type: 'bar',
+            stack: 'total',
+            data: incomeData,
+            itemStyle: { color: '#3ddc97', borderRadius: [2, 2, 0, 0] }
+          },
+          {
+            name: '净流',
+            type: 'line',
+            data: netData,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { color: '#7aa2ff', width: 2 },
+            itemStyle: { color: '#7aa2ff' },
+            markLine: {
+              silent: true,
+              symbol: 'none',
+              lineStyle: { color: '#5e677a', type: 'dashed', width: 1 },
+              data: [{ yAxis: 0 }]
+            }
+          }
+        ]
+      };
+      waterfallChart.setOption(option);
+
+      container.querySelectorAll(".infl-toggle button").forEach(btn => {
         btn.addEventListener("click", () => {
           const newMode = btn.dataset.mode;
           inflationMode = newMode;
@@ -544,6 +600,7 @@
       side_gig: "🪢 零散收入",
       family_deposit: "👵 家庭代管",
       stock_vest: "📜 股票兑现",
+      severance: "🎁 离职大礼包",
       bonus: "🎉 奖金",
       transport: "🚗 行车交通",
       telecom: "📡 通讯",

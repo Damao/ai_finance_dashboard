@@ -89,18 +89,21 @@
         label: "配置版本",
         value: target.version || "—",
         sub: `更新于 ${target.updated || "—"}`,
+        help: "target.json 的版本号与更新时间，用于追踪战略/假设变更",
         tone: "ok"
       },
       {
         label: "模块 / 子项数",
         value: `${modules.length} / ${subCount}`,
         sub: `目标占比合计 ${pct(totalTargetPct, 0)}`,
+        help: "目标占比合计应接近100%；偏离表示target配置尚未闭合或有留白",
         tone: totalTargetPct >= 0.99 && totalTargetPct <= 1.01 ? "ok" : "warn"
       },
       {
         label: "最新快照",
         value: latest ? latest.date : "—",
         sub: latest ? `总盘 ${fmtK(latest.total || 0)}` : "无历史数据",
+        help: "history.json 最新快照日期与当时总盘（折RMB）",
         tone: "ok"
       },
       {
@@ -112,6 +115,7 @@
           return `${done}/${ms.length}`;
         })(),
         sub: "已完成 / 总计",
+        help: "target.json 里的 milestones 完成数 / 总数",
         tone: "ok"
       }
     ];
@@ -119,9 +123,9 @@
     $("#target-kpis").innerHTML = kpis.map(k => `
       <div class="kpi ${k.tone}">
         <div class="stripe"></div>
-        <div class="label">${k.label}</div>
-        <div class="value num">${k.value}</div>
-        <div class="sub">${k.sub}</div>
+        <div class="label" title="${k.help || ""}">${k.label}</div>
+        <div class="value num" title="${k.help || ""}">${k.value}</div>
+        <div class="sub" title="${k.help || ""}">${k.sub}</div>
       </div>
     `).join("");
   }

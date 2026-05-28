@@ -80,7 +80,7 @@
         const baseAnnual = toRMB(e.amount, e.ccy) * (e.frequency === "annual" ? 1 : months);
         return a + baseAnnual;
       }, 0);
-      // income_events.json 当年的一次性事件（股票兑现/项目分红/单点奖金等）
+      // income_events.json 当年的一次性事件（股票兑现/离职大礼包/项目分红）
       const oneOffEvents = (incEv.events || []).filter(ev => ev.year === yearNum && ev.amount > 0);
       const oneOffAnnual = oneOffEvents.reduce((a, ev) => a + toRMB(ev.amount, ev.ccy || "RMB"), 0);
       const totalExpense = totalExpenseProj + recurringAnnual;
@@ -98,31 +98,37 @@
       const ytdHint = isPartial ? `<br/><span style="color:var(--warn);font-size:11px">⏳ 截止 ${data.asOf}（${(yearProgress*100).toFixed(0)}%）</span>` : "";
       const oneOffHint = oneOffAnnual > 0 ? ` · 一次性 ${fmtK(oneOffAnnual)}` : "";
       const kpis = [
-        { label: "本年总收入（年化）",  value: fmtK(totalIncome),  sub: `工资+房租+股息+代管${oneOffHint} ${projectedHint}`, tone: "ok" },
+        { label: "本年总收入（年化）",  value: fmtK(totalIncome),  sub: `工资+房租+股息+代管${oneOffHint} ${projectedHint}`, tone: "ok",
+          help: "年化口径：对未满一年的数据按进度推算全年；含recurring循环收入与一次性事件" },
         { label: "本年总支出（年化）",  value: fmtK(totalExpense), sub: `${exps.length} 大类 + 刚性 ${fmtK(recurringAnnual)}${ytdHint}`,
           tone: net >= 0 ? "ok" : "warn",
+          help: "年化口径：弹性支出按yearProgress推算全年；刚性支出来自recurring.json折算全年",
           delta: prevData ? `同比 ${expDelta>=0?'+':''}${(expDelta*100).toFixed(1)}%` : (isPartial ? "首年完整数据待年底" : "首年数据"),
           deltaCls: expDelta > 0.1 ? "down" : (expDelta < -0.1 ? "up" : "flat") },
         { label: "净结余（年化）",    value: (net>=0?"+":"") + fmtK(net),
           sub: net >= 0 ? "本年有结余" : "支出超过收入",
+          help: "净结余=总收入-总支出（年化口径）",
           tone: net >= 0 ? "ok" : "danger" },
         { label: "储蓄率（年化）",    value: pct(totalIncome ? net/totalIncome : 0,1),
           sub: totalIncome && net/totalIncome > 0.3 ? "≥ 30% 健康" : "建议 ≥ 30%",
+          help: "储蓄率=净结余/总收入（年化口径）",
           tone: totalIncome && net/totalIncome > 0.3 ? "ok" : "warn" },
         { label: "弹性支出（截止）",  value: fmtK(totalExpenseYTD),
           sub: isPartial ? `已花 ${fmtK(totalExpenseYTD)} → 年化 ${fmtK(totalExpenseProj)}` : `非刚性部分`,
+          help: "弹性支出=非recurring的支出；若是partial则展示截止金额与推算全年",
           tone: "ok" },
         { label: "刚性 vs 弹性",     value: `${pct(recurringAnnual/totalExpense,0)} : ${pct(totalExpenseProj/totalExpense,0)}`,
           sub: `刚性 ${fmtK(recurringAnnual)}/年 · 弹性 ${fmtK(totalExpenseProj)}/年`,
+          help: "支出结构占比：刚性（recurring）与弹性（可变支出）各占总支出的比例",
           tone: "ok" },
       ];
       $("#cash-kpis").innerHTML = kpis.map(k => `
         <div class="kpi ${k.tone}">
           <div class="stripe"></div>
-          <div class="label">${k.label}</div>
-          <div class="value num">${k.value}</div>
-          <div class="sub">${k.sub}</div>
-          ${k.delta ? `<div class="delta ${k.deltaCls||'flat'}">${k.delta}</div>` : ""}
+          <div class="label" title="${k.help || ""}">${k.label}</div>
+          <div class="value num" title="${k.help || ""}">${k.value}</div>
+          <div class="sub" title="${k.help || ""}">${k.sub}</div>
+          ${k.delta ? `<div class="delta ${k.deltaCls||'flat'}" title="${k.help || ""}">${k.delta}</div>` : ""}
         </div>
       `).join("");
 

@@ -154,7 +154,7 @@ window.AssetCore = (function () {
     });
 
     // 金融盘 vs 整体盘（剔除房产 + 待变现）
-    const realEstateKeys = new Set(["qianhai_property","home_property","property_a","property_b"]);
+    const realEstateKeys = new Set(["qianhai_property","dingtai_property"]);
     let financialTotal = 0;
     modules.forEach(function (m) {
       if (m.key === "_orphan") return;
@@ -170,7 +170,7 @@ window.AssetCore = (function () {
   // ========== 加权预期年化 ==========
   function weightedExpectedReturn(cur, scenario, opts) {
     opts = opts || {};
-    const realEstateKeys = new Set(["qianhai_property","home_property","property_a","property_b"]);
+    const realEstateKeys = new Set(["qianhai_property","dingtai_property"]);
     let weighted = 0, totalW = 0;
     cur.modules.forEach(function (m) {
       if (m.key === "_orphan" && opts.excludeOrphan !== false) return;
@@ -261,7 +261,7 @@ window.AssetCore = (function () {
         category: "pending",
         title: "存在待变现资产",
         detail: `${fmtK(orphan.total)} RMB（占 ${(orphan.actualPct*100).toFixed(1)}%）。`,
-        action: "完成 P0 资产定价 + 售出后重分配",
+        action: "完成 P0 鼎太定价 + 售出后重分配",
       });
     }
 

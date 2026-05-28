@@ -244,6 +244,15 @@
   .target-mod td.r{text-align:right;font-family:"JetBrains Mono",monospace}
   .target-mod td .note{color:var(--text-3);font-size:var(--fs-xs)}
 
+  .changelog{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--radius);padding:var(--pad-card);margin-top:var(--gap)}
+  .changelog h3{margin:0 0 8px;font-size:var(--fs-xs);color:var(--text-2);font-weight:500;letter-spacing:.3px;text-transform:uppercase}
+  .changelog .entry{padding:6px 0;border-bottom:1px dashed var(--line)}
+  .changelog .entry:last-child{border-bottom:none}
+  .changelog .entry .head{display:flex;gap:12px;align-items:baseline;margin-bottom:3px}
+  .changelog .entry .ver{font-weight:600;color:var(--accent);font-family:"JetBrains Mono",monospace;font-size:var(--fs-xs)}
+  .changelog .entry .d{color:var(--text-3);font-family:"JetBrains Mono",monospace;font-size:10px}
+  .changelog .entry ul{margin:2px 0 0;padding-left:14px;color:var(--text-1);font-size:var(--fs-sm);line-height:1.55}
+
   /* ============= SWR 反推卡（FIRE 总盘目标）============= */
   .swr-card{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
   .swr-card:empty{display:none}
@@ -266,6 +275,18 @@
   .swr-row .progress.far{color:var(--text-2)}
   .swr-foot{padding:7px 14px 9px;font-size:var(--fs-xs);color:var(--text-2);background:var(--bg-0);border-top:1px solid var(--line)}
   .swr-foot code{color:var(--text-1);font-family:"JetBrains Mono",monospace}
+
+  /* Coast FIRE 已达成态：整卡左侧绿色高亮带 */
+  .swr-card.achieved{border-color:rgba(61,220,151,.35);box-shadow:inset 3px 0 0 var(--ok)}
+  .swr-card.achieved .swr-head .title{color:var(--ok)}
+
+  /* Full FIRE 兜底行（Bengen 3.5%）— 单行紧凑展示 */
+  .swr-bengen{display:grid;grid-template-columns:auto 1fr auto;gap:14px;padding:7px 14px;align-items:baseline;font-size:var(--fs-xs);background:var(--bg-2);border-top:1px solid var(--line);color:var(--text-2)}
+  .swr-bengen .bengen-label{font-weight:600;color:var(--text-1);font-family:"JetBrains Mono",monospace;letter-spacing:.3px}
+  .swr-bengen .bengen-detail{color:var(--text-2)}
+  .swr-bengen .bengen-detail b{color:var(--text-0);font-family:"JetBrains Mono",monospace;font-weight:600}
+  .swr-bengen .bengen-progress{font-family:"JetBrains Mono",monospace;color:var(--text-1);font-weight:500}
+  .swr-bengen .bengen-progress.done{color:var(--ok)}
 
   /* ============= MILESTONES ============= */
   .ms-summary{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
@@ -344,6 +365,29 @@
   footer{margin-top:24px;color:var(--text-3);font-size:10px;text-align:center;line-height:1.6;font-family:"JetBrains Mono",monospace}
   footer code{background:var(--bg-2);padding:1px 4px;border-radius:3px;color:var(--text-2)}
 
+  .btn{appearance:none;border:1px solid var(--line);background:var(--bg-2);color:var(--text-1);border-radius:999px;padding:5px 10px;font-size:11px;line-height:1;cursor:pointer;font-family:"JetBrains Mono",monospace}
+  .btn:hover{border-color:var(--line-2);color:var(--text-0)}
+  .btn.primary{border-color:rgba(122,162,255,.35);color:var(--text-0)}
+  .btn.primary:hover{border-color:rgba(122,162,255,.6)}
+
+  .tt-bubble{position:fixed;z-index:9999;max-width:380px;min-width:220px;pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .12s ease, transform .12s ease;background:rgba(19,23,31,.98);border:1px solid rgba(42,50,67,.9);border-radius:10px;box-shadow:0 18px 48px rgba(0,0,0,.45);padding:10px 12px;color:var(--text-1);font-size:12px;line-height:1.55}
+  .tt-bubble.show{opacity:1;transform:translateY(0)}
+  .tt-title{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+  .tt-body b{color:var(--text-0);font-weight:600}
+  .tt-body code{background:var(--bg-2);padding:1px 4px;border-radius:4px;color:var(--text-1);font-family:"JetBrains Mono",monospace;font-size:11px}
+
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);z-index:9998;display:none}
+  .modal-mask.show{display:block}
+  .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9999;width:min(820px, calc(100vw - 28px));max-height:min(720px, calc(100vh - 28px));overflow:auto;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:none}
+  .modal.show{display:block}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .modal-title{font-size:13px;font-weight:600;color:var(--text-0);letter-spacing:.2px}
+  .modal-body{padding:14px 16px;color:var(--text-1);font-size:13px;line-height:1.7}
+  .modal-body h3{margin:14px 0 8px;font-size:12px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .modal-body ul{margin:0;padding-left:16px}
+  .modal-body li{margin:4px 0}
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid var(--line);background:var(--bg-2)}
+
   /* ============= MOBILE ============= */
   @media (max-width: 820px){
     .wrap{padding:14px 14px 40px}
@@ -365,13 +409,14 @@
       <p>资产 · 负债 · 现金流</p>
     </div>
     <div class="meta">
-      <span>快照</span>
-      <select id="date-picker" class="date-picker"></select>
+      <span title="选择历史快照；看板所有数字均基于当前选中的快照">快照</span>
+      <select id="date-picker" class="date-picker" title="选择历史快照；看板所有数字均基于当前选中的快照"></select>
       <span class="sep"></span>
-      <span>USD <b id="rate-usd">—</b></span>
-      <span>HKD <b id="rate-hkd">—</b></span>
+      <span title="当前快照汇率：1 USD 折算为多少 RMB">USD <b id="rate-usd">—</b></span>
+      <span title="当前快照汇率：1 HKD 折算为多少 RMB">HKD <b id="rate-hkd">—</b></span>
       <span class="sep"></span>
       <span class="meta-comment" id="snapshot-comment"></span>
+      <button class="btn primary" id="help-open" type="button">新手</button>
     </div>
   </header>
 
@@ -380,10 +425,25 @@
     <button class="tab-btn" data-tab="target">🎯 目标配置</button>
     <button class="tab-btn" data-tab="liab">💸 负债与刚性</button>
     <button class="tab-btn" data-tab="cash">📈 现金流追踪</button>
+    <button class="tab-btn" data-tab="tax">💰 税务计算</button>
   </nav>
 
   <!-- =========== Tab 1: 资产配置 =========== -->
   <div class="tab-pane active" id="tab-assets">
+    <div class="lia-card" id="beginner-strip" style="display:none;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">入门速览</div>
+          <div style="font-size:13px;color:var(--text-1);line-height:1.65">
+            先选 <b>快照</b> → 看 <b>模块</b> 是否超阈值 → 点开子项：右侧 <b>实际占比</b> 与 <b>Δ(pp)</b> 看“偏多/偏少”。
+            <br/>子项里：<b>市值</b> 是折RMB；<b>浮盈亏</b> 只对证券类（有成本）展示。
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="beginner-off" type="button">关闭</button>
+        </div>
+      </div>
+    </div>
     <div id="health-check"></div>
     <div id="tencent-ladder"></div>
     <div id="reconcile-bar"></div>
@@ -402,14 +462,14 @@
         <table class="al" id="alerts">
           <thead>
             <tr>
-              <th>模块</th>
-              <th>子项</th>
-              <th class="r">市值（RMB）</th>
-              <th class="r">实际占比</th>
-              <th class="r">大类目标</th>
-              <th class="r">大类阈值</th>
-              <th class="r">偏离</th>
-              <th>大类状态</th>
+              <th title="模块（大类）名称">模块</th>
+              <th title="子项名称（具体账户/标的）">子项</th>
+              <th class="r" title="市值（折RMB）：原币金额/证券市值按汇率折算">市值（RMB）</th>
+              <th class="r" title="实际占比=该项市值/总盘">实际占比</th>
+              <th class="r" title="该模块目标占比（来自target.json）">大类目标</th>
+              <th class="r" title="模块阈值：超过±阈值会触发超标/偏低告警">大类阈值</th>
+              <th class="r" title="偏离Δ=实际占比-目标占比（单位pp）">偏离</th>
+              <th title="模块状态：正常/大类超标/大类偏低">大类状态</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -464,13 +524,7 @@
     </section>
   </div>
 
-  <!-- =========== Tab 2: 目标配置 =========== -->
-  <div class="tab-pane" id="tab-target">
-    <div class="kpis" id="target-kpis"></div>
-    <div id="target-content"></div>
-  </div>
-
-  <!-- =========== Tab 3: 负债与刚性 =========== -->
+  <!-- =========== Tab 2: 负债与刚性 =========== -->
   <div class="tab-pane" id="tab-liab">
     <div class="kpis" id="liab-kpis"></div>
 
@@ -546,10 +600,58 @@
     </section>
   </div>
 
+  <!-- =========== Tab 2: 目标配置 =========== -->
+  <div class="tab-pane" id="tab-target">
+    <div class="kpis" id="target-kpis"></div>
+    <div id="target-content"></div>
+  </div>
+
+  <!-- =========== Tab 4: 税务计算 =========== -->
+  <div class="tab-pane" id="tab-tax">
+    <div class="kpis" id="tax-kpis"></div>
+    <div id="tax-content"></div>
+  </div>
+
   <footer>
     <code>data/target.json</code> · <code>history.json</code> · <code>liabilities.json</code> · <code>recurring.json</code> · <code>income_events.json</code> · <code>transactions/</code>
-    　|　Bloomberg Dark · JetBrains Mono · DEMO 数据，金额都是虚构的
+    　|　Bloomberg Dark · JetBrains Mono · 小龙猫 @ <code>memory/areas/life_planning/asset_dashboard/</code>
   </footer>
+</div>
+
+<div class="modal-mask" id="modal-mask"></div>
+<div class="modal" id="help-modal" role="dialog" aria-modal="true" aria-label="新手入门">
+  <div class="modal-head">
+    <div class="modal-title">新手入门 · 怎么读这张看板</div>
+    <button class="btn" id="help-close" type="button">关闭</button>
+  </div>
+  <div class="modal-body">
+    <h3>核心口径</h3>
+    <ul>
+      <li><b>市值（RMB）</b>：所有资产按汇率折算到人民币的市值口径。</li>
+      <li><b>实际占比</b>：该模块/子项市值 ÷ 总盘。</li>
+      <li><b>Δ（pp）</b>：偏离度 = 实际占比 − 目标占比，单位是百分点（pp），不是涨跌幅。</li>
+      <li><b>阈值</b>：超过阈值会标为超/偏低；一般用于再平衡提醒。</li>
+    </ul>
+    <h3>推荐阅读顺序</h3>
+    <ul>
+      <li>顶部 KPI：先看红线（腾讯单一敞口、RMB占比）和告警数量。</li>
+      <li>模块画像：看哪些模块超/偏低；再看具体子项的 Δ(pp)。</li>
+      <li>池分离：RMB 池与海外池物理隔离，不能互相“补位”。</li>
+    </ul>
+    <h3>交互</h3>
+    <ul>
+      <li>悬停任意数字/表头：显示口径说明。</li>
+      <li>移动端：点一下显示说明，再点空白关闭。</li>
+    </ul>
+  </div>
+  <div class="modal-foot">
+    <button class="btn primary" id="beginner-on" type="button">开启新手模式</button>
+    <button class="btn" id="beginner-off-2" type="button">关闭新手模式</button>
+  </div>
+</div>
+<div class="tt-bubble" id="tt" role="tooltip" aria-hidden="true">
+  <div class="tt-title" id="tt-title" style="display:none"></div>
+  <div class="tt-body" id="tt-body"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
@@ -557,12 +659,17 @@
 <script src="./app.js"></script>
 <script src="./liabilities.js"></script>
 <script src="./cashflow.js"></script>
+<script src="./tax.js"></script>
 <script src="./target.js"></script>
 <script>
-  // Tab 切换 + URL hash 路由（方便外部用 #liab / #cash 直链跳转或截图）
+  // Tab 切换 + URL hash 路由（方便外部用 #liab / #cash / #tax 直链跳转或截图）
   function activateTab(tab) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     document.querySelectorAll(".tab-pane").forEach(p => p.classList.toggle("active", p.id === "tab-" + tab));
+    // 切换到税务 Tab 时自动渲染
+    if (tab === "tax" && typeof renderTaxTab === "function") {
+      renderTaxTab();
+    }
     // 切换到目标配置 Tab 时自动渲染
     if (tab === "target" && typeof renderTargetTab === "function") {
       renderTargetTab();
@@ -574,7 +681,6 @@
       history.replaceState(null, "", "#" + btn.dataset.tab);
     });
   });
-  // 初次加载：根据 hash 切 tab
   (function () {
     const h = (location.hash || "").replace("#", "");
     if (h && document.getElementById("tab-" + h)) activateTab(h);
@@ -583,6 +689,158 @@
     const h = location.hash.replace("#", "");
     if (h && document.getElementById("tab-" + h)) activateTab(h);
   });
+
+  (function () {
+    const tt = document.getElementById("tt");
+    const ttBody = document.getElementById("tt-body");
+    const ttTitle = document.getElementById("tt-title");
+    let pinned = false;
+    let activeEl = null;
+    let raf = 0;
+
+    function getTip(el) {
+      if (!el) return "";
+      const v = el.getAttribute("data-tip") || "";
+      return v.trim();
+    }
+    function ensureTip(el) {
+      if (!el) return;
+      const t = el.getAttribute("title");
+      if (t && !el.getAttribute("data-tip")) {
+        el.setAttribute("data-tip", t);
+        el.removeAttribute("title");
+      }
+    }
+    function findTipTarget(start) {
+      let el = start;
+      for (let i = 0; i < 6 && el; i++, el = el.parentElement) {
+        ensureTip(el);
+        if (getTip(el)) return el;
+      }
+      return null;
+    }
+    function setContent(text) {
+      const parts = String(text || "").split("\n").map(s => s.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        ttTitle.style.display = "";
+        ttTitle.textContent = parts[0];
+        ttBody.textContent = parts.slice(1).join("\n");
+      } else {
+        ttTitle.style.display = "none";
+        ttTitle.textContent = "";
+        ttBody.textContent = parts[0] || "";
+      }
+    }
+    function place(el) {
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const pad = 10;
+      tt.style.left = "0px";
+      tt.style.top = "0px";
+      const w = tt.offsetWidth || 320;
+      const h = tt.offsetHeight || 80;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let x = r.left + (r.width / 2) - (w / 2);
+      let y = r.top - h - 10;
+      if (y < pad) y = r.bottom + 10;
+      x = Math.max(pad, Math.min(vw - w - pad, x));
+      y = Math.max(pad, Math.min(vh - h - pad, y));
+      tt.style.left = Math.round(x) + "px";
+      tt.style.top = Math.round(y) + "px";
+    }
+    function show(el) {
+      const tip = getTip(el);
+      if (!tip) return;
+      activeEl = el;
+      setContent(tip);
+      tt.classList.add("show");
+      tt.setAttribute("aria-hidden", "false");
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => place(el));
+    }
+    function hide() {
+      if (pinned) return;
+      activeEl = null;
+      tt.classList.remove("show");
+      tt.setAttribute("aria-hidden", "true");
+    }
+    document.addEventListener("pointerover", (e) => {
+      if (pinned) return;
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      const el = findTipTarget(e.target);
+      if (!el) return;
+      show(el);
+    }, { passive: true });
+    document.addEventListener("pointerout", (e) => {
+      if (pinned) return;
+      if (e.pointerType && e.pointerType !== "mouse") return;
+      const rel = e.relatedTarget;
+      if (activeEl && rel && activeEl.contains(rel)) return;
+      hide();
+    }, { passive: true });
+    document.addEventListener("focusin", (e) => {
+      if (pinned) return;
+      const el = findTipTarget(e.target);
+      if (el) show(el);
+    }, { passive: true });
+    document.addEventListener("focusout", () => { hide(); }, { passive: true });
+    document.addEventListener("click", (e) => {
+      const el = findTipTarget(e.target);
+      if (el) {
+        if (pinned && activeEl === el) {
+          pinned = false;
+          hide();
+        } else {
+          pinned = true;
+          show(el);
+        }
+        return;
+      }
+      if (pinned) {
+        pinned = false;
+        hide();
+      }
+    });
+    window.addEventListener("scroll", () => { if (activeEl) place(activeEl); }, { passive: true });
+    window.addEventListener("resize", () => { if (activeEl) place(activeEl); }, { passive: true });
+  })();
+
+  (function () {
+    const mask = document.getElementById("modal-mask");
+    const modal = document.getElementById("help-modal");
+    const openBtn = document.getElementById("help-open");
+    const closeBtn = document.getElementById("help-close");
+    const beginnerStrip = document.getElementById("beginner-strip");
+    const beginnerOn = document.getElementById("beginner-on");
+    const beginnerOff = document.getElementById("beginner-off");
+    const beginnerOff2 = document.getElementById("beginner-off-2");
+    const LS_KEY = "afd_beginner";
+
+    function setBeginner(on) {
+      const v = !!on;
+      localStorage.setItem(LS_KEY, v ? "1" : "0");
+      beginnerStrip.style.display = v ? "" : "none";
+    }
+    function getBeginner() {
+      return localStorage.getItem(LS_KEY) === "1";
+    }
+    function open() {
+      mask.classList.add("show");
+      modal.classList.add("show");
+    }
+    function close() {
+      mask.classList.remove("show");
+      modal.classList.remove("show");
+    }
+    openBtn.addEventListener("click", open);
+    closeBtn.addEventListener("click", close);
+    mask.addEventListener("click", close);
+    beginnerOn.addEventListener("click", () => setBeginner(true));
+    beginnerOff.addEventListener("click", () => setBeginner(false));
+    beginnerOff2.addEventListener("click", () => setBeginner(false));
+
+    setBeginner(getBeginner());
+  })();
 </script>
 </body>
 </html>
